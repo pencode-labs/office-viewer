@@ -1,7 +1,6 @@
 import { Archive, attr, child, children, descendants, tag, text } from './archive.js';
 import type { XmlNode } from './archive.js';
 import { escape } from './render.js';
-export const PageRows = 50, PageColumns = 20;
 export interface Sheet { name: string; part: string }
 export function columnNumber(reference: string): number {
   const match = /^([A-Z]{1,3})[1-9]\d{0,6}$/i.exec(reference);
@@ -85,22 +84,20 @@ export class SheetData {
       if (cells.size) { this.rows.set(number, cells); this.rowCount = Math.max(this.rowCount, number); }
     }
   }
-  render(rowPage: number, columnPage: number): string {
+  render(): string {
     if (!this.rows.size) return '<p class="muted">此工作表为空。</p>';
-    const startRow = rowPage * PageRows + 1, endRow = Math.min(this.rowCount, startRow + PageRows - 1);
-    const startColumn = columnPage * PageColumns + 1, endColumn = Math.min(this.columnCount, startColumn + PageColumns - 1);
     let html = '<table class="sheet"><thead><tr><th aria-label="行号"></th>';
-    for (let c = startColumn; c <= endColumn; c++) html += `<th>${columnName(c)}</th>`;
+    for (let c = 1; c <= this.columnCount; c++) html += `<th>${columnName(c)}</th>`;
     html += '</tr></thead><tbody>';
-    for (let r = startRow; r <= endRow; r++) {
+    for (let r = 1; r <= this.rowCount; r++) {
       html += `<tr><th>${r}</th>`;
       const row = this.rows.get(r);
-      for (let c = startColumn; c <= endColumn; c++) {
+      for (let c = 1; c <= this.columnCount; c++) {
         const cell = row?.get(c), value = cell ? this.book.value(cell) : '';
-        const display = value.length > 512 ? value.slice(0, 512) + '…' : value;
-        html += `<td>${escape(display)}</td>`;
+        html += `<td>${escape(value)}</td>`;
       }
       html += '</tr>';
+      if (html.length > 1800 << 10) throw new Error('当前工作表内容超过预览限制（约 1.8 MiB），请拆分工作表后重试');
     }
     return html + '</tbody></table>';
   }

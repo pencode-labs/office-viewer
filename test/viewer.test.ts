@@ -21,7 +21,7 @@ test('Word preserves inline order, formatting, tables and escapes file text', ()
   assert.doesNotMatch(view.view!.html!, /<script>/);
   assert.match(view.view!.html!, /data-pencode-searchable/);
 });
-test('Excel resolves relationships, strings, cached formulas, dates and sparse pages', () => {
+test('Excel resolves relationships, strings, cached formulas, dates and all sparse rows and columns without paging', () => {
   const data = zip({
     'xl/workbook.xml': '<workbook><sheets><sheet name="数据 &amp; 汇总" r:id="r1"/><sheet name="另一个表" r:id="r2"/><sheet name="hidden" state="hidden" r:id="r3"/></sheets></workbook>',
     'xl/_rels/workbook.xml.rels': '<Relationships><Relationship Id="r1" Target="worksheets/data.xml"/><Relationship Id="r2" Target="worksheets/empty.xml"/></Relationships>',
@@ -32,15 +32,28 @@ test('Excel resolves relationships, strings, cached formulas, dates and sparse p
   });
   const document = new OfficeDocument('/book.xlsx', data);
   const first = html(document);
-  for (const value of ['共享字符串', '00123', '<td>2</td>', '1900-01-01', '12.50%', '[公式无缓存值]', '数据 &amp; 汇总']) assert.ok(first.includes(value), value);
+  for (const value of ['共享字符串', '00123', '<td>2</td>', '1900-01-01', '12.50%', '[公式无缓存值]', '数据 &amp; 汇总', '第二页右侧', '<th>U</th>', '<th>51</th>']) assert.ok(first.includes(value), value);
   assert.doesNotMatch(first, /sheet-2/);
-  assert.equal(document.event('rows-next'), true); assert.equal(document.event('columns-next'), true);
-  assert.match(html(document), /第二页右侧/);
-  assert.equal(document.event('rows-next'), false);
+  assert.doesNotMatch(first, /paging|rows-next|columns-next|office-actions|data-ref="reload"/);
+  assert.match(first, /data-ref="sheet-0"[^>]*aria-pressed="true"/);
+  assert.match(first, /data-pencode-selectable data-pencode-searchable data-pencode-preserve-whitespace/);
+  assert.equal(document.event('next'), false);
   assert.equal(document.event('sheet-1'), true); assert.match(html(document), /此工作表为空/);
+  assert.match(html(document), /data-ref="sheet-1"[^>]*aria-pressed="true"/);
+  assert.match(html(document), /data-ref="sheet-0"[^>]*aria-pressed="false"/);
   assert.equal(document.event('sheet-99'), false);
   assert.equal(columnNumber('XFD1048576'), 16384); assert.equal(columnName(16384), 'XFD');
   assert.equal(columnNumber('XFE1'), 0);
+});
+test('Excel retains full cell text and bounds oversized sparse grids', () => {
+  const workbook = (row: number, value: string) => zip({
+    'xl/workbook.xml': '<workbook><sheets><sheet name="Sheet1" r:id="r1"/></sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<Relationships><Relationship Id="r1" Target="worksheets/data.xml"/></Relationships>',
+    'xl/worksheets/data.xml': `<worksheet><sheetData><row r="${row}"><c r="A${row}" t="inlineStr"><is><t>${value}</t></is></c></row></sheetData></worksheet>`,
+  });
+  const value = '  ' + '长文本'.repeat(300) + '\n末尾搜索词  ';
+  assert.ok(html(new OfficeDocument('/long.xlsx', workbook(1, value))).includes(value));
+  assert.throws(() => html(new OfficeDocument('/sparse.xlsx', workbook(1048576, 'last'))), /预览限制/);
 });
 test('PowerPoint follows presentation order and excludes external images', () => {
   const data = zip({

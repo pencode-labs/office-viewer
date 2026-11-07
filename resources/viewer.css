@@ -1,24 +1,33 @@
-.office-viewer { box-sizing: border-box; min-height: 100%; padding: 20px 24px; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); line-height: 1.6; }
-.office-viewer header { display: flex; align-items: center; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--vscode-editorWidget-border); }
-.office-viewer header strong { flex: 1; overflow-wrap: break-word; }
+.office-viewer { box-sizing: border-box; width: 100%; min-width: 0; min-height: 100%; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); line-height: 1.6; }
 .office-viewer .muted { color: var(--vscode-descriptionForeground); }
-.office-viewer button { padding: 5px 12px; border: 1px solid var(--vscode-editorWidget-border); border-radius: 4px; color: var(--vscode-editor-foreground); background: var(--vscode-editorWidget-background); cursor: pointer; }
-.office-viewer button:hover { background: var(--vscode-list-hoverBackground); }
-.office-viewer button:focus { outline: 1px solid var(--vscode-focusBorder); }
-.office-viewer button[disabled] { opacity: 0.4; cursor: default; }
-.office-viewer button[aria-pressed="true"] { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
-.office-viewer .sheet-tabs { display: flex; gap: 6px; padding-top: 16px; overflow: auto; }
-.office-viewer .paging { display: flex; align-items: center; gap: 12px; padding: 16px 0; }
-.office-viewer .paging span { color: var(--vscode-descriptionForeground); }
-.office-content { max-width: 960px; margin: 24px auto; overflow-wrap: break-word; }
+.office-toolbar { display: flex; align-items: flex-start; gap: 8px; box-sizing: border-box; min-height: 36px; padding: 4px 8px; border-bottom: 1px solid var(--vscode-editorGroup-border); }
+.office-viewer button { box-sizing: border-box; flex-shrink: 0; margin: 0; padding: 4px 10px; border: 0; border-radius: 3px; color: var(--vscode-editor-foreground); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.office-viewer button:hover { background: var(--vscode-toolbar-hoverBackground); }
+.office-viewer button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+.office-viewer button:disabled { opacity: 0.4; background: transparent; cursor: default; }
+.office-viewer .sheet-tabs button[aria-pressed="true"] { color: var(--vscode-button-foreground); background: var(--vscode-button-background); border-bottom-color: var(--vscode-focusBorder); font-weight: 600; }
+.office-viewer .icon-button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 6px; color: var(--vscode-icon-foreground); }
+.office-icon { position: relative; display: block; box-sizing: border-box; width: 7px; height: 7px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; }
+.office-icon.right { transform: rotate(45deg); }
+.office-icon.left { transform: rotate(225deg); }
+.office-actions { display: flex; margin-left: auto; }
+.office-viewer .sheet-tabs { display: flex; flex: 1 1 160px; min-width: 0; gap: 2px; overflow: auto; }
+.office-viewer .sheet-tabs button { max-width: 180px; border-bottom: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.office-viewer .paging { display: flex; flex-shrink: 0; align-items: center; gap: 2px; }
+.office-viewer .paging span { color: var(--vscode-descriptionForeground); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.office-content { box-sizing: border-box; width: 100%; min-width: 0; margin: 0; padding: 16px 20px; overflow: auto; overflow-wrap: break-word; user-select: text; }
 .office-content p { min-height: 1em; margin: 0 0 12px; white-space: pre-wrap; }
 .office-content .list-item { padding-left: 20px; }
 .office-content img { display: block; max-width: 100%; height: auto; margin: 16px 0; }
-.office-content table { border-spacing: 0; border-collapse: collapse; margin: 16px 0; }
-.office-content th, .office-content td { padding: 6px 12px; border: 1px solid var(--vscode-editorWidget-border); vertical-align: top; }
+.office-content table { border-spacing: 0; border-collapse: collapse; margin: 0 0 16px; }
+.office-content th, .office-content td { padding: 6px 12px; border: 1px solid var(--vscode-editorGroup-border); vertical-align: top; }
 .office-content th { background: var(--vscode-editorWidget-background); font-weight: 600; }
 .office-content td p { margin: 0; }
-.office-content.workbook { max-width: none; margin: 0; overflow: auto; }
+.office-content.workbook { padding: 0; }
+.office-content.workbook > .muted { padding: 16px 20px; }
+.office-content .sheet { margin: 0; }
 .office-content .sheet td { min-width: 96px; max-width: 320px; white-space: pre-wrap; }
 .office-content .sheet th { white-space: nowrap; }
-.office-content.slide { padding: 24px; border: 1px solid var(--vscode-editorWidget-border); background: var(--vscode-editorWidget-background); }
+.office-error h2 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
+.office-error p { color: var(--vscode-descriptionForeground); }
+.office-content, .office-viewer .sheet-tabs { scrollbar-width: thin; scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }

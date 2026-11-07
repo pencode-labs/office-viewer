@@ -1,14 +1,18 @@
 import { open } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import { basename, extname } from 'node:path';
+import { extname } from 'node:path';
 import { Archive, attr, descendants } from './archive.js';
 import { escape, slidePage, wordPage } from './render.js';
-import { PageColumns, PageRows, Workbook } from './workbook.js';
+import { Workbook } from './workbook.js';
 import type { SheetData } from './workbook.js';
 import type { EditorMessage, EditorReply, Input } from '@pencode/peb';
 const css = readFileSync(new URL('../resources/viewer.css', import.meta.url), 'utf8');
 
 const MaxFile = 32 << 20;
+function iconButton(ref: string, label: string, icon: string, disabled = false): string {
+  return `<button class="icon-button" type="button" data-ref="${ref}" title="${label}" aria-label="${label}"${disabled ? ' disabled' : ''}><span class="office-icon ${icon}" aria-hidden="true"></span></button>`;
+}
+
 export async function readOffice(path: string): Promise<Buffer> {
   const file = await open(path, 'r');
   try {
@@ -33,8 +37,6 @@ export class OfficeDocument {
   private readonly slides: string[] = [];
   private readonly word: string;
   private index = 0;
-  private rowPage = 0;
-  private columnPage = 0;
   constructor(readonly path: string, data: Uint8Array) {
     this.archive = new Archive(data);
     const extension = extname(path).toLowerCase();
@@ -55,37 +57,33 @@ export class OfficeDocument {
       const index = Number(ref.slice(6));
       if (!Number.isInteger(index) || index < 0 || index >= this.book.sheets.length || index === this.index) return false;
       const sheet = this.book.open(index);
-      this.index = index; this.sheet = sheet; this.rowPage = this.columnPage = 0; return true;
+      this.index = index; this.sheet = sheet; return true;
     }
-    const oldIndex = this.index, oldRow = this.rowPage, oldColumn = this.columnPage;
-    switch (ref) {
-      case 'previous': this.index = Math.max(0, this.index - 1); break;
-      case 'next': this.index = Math.min(this.slides.length - 1, this.index + 1); break;
-      case 'rows-previous': this.rowPage = Math.max(0, this.rowPage - 1); break;
-      case 'rows-next': if (this.sheet) this.rowPage = Math.min(Math.max(0, Math.ceil(this.sheet.rowCount / PageRows) - 1), this.rowPage + 1); break;
-      case 'columns-previous': this.columnPage = Math.max(0, this.columnPage - 1); break;
-      case 'columns-next': if (this.sheet) this.columnPage = Math.min(Math.max(0, Math.ceil(this.sheet.columnCount / PageColumns) - 1), this.columnPage + 1); break;
-    }
-    return oldIndex !== this.index || oldRow !== this.rowPage || oldColumn !== this.columnPage;
+    if (!this.slides.length) return false;
+    const previous = this.index;
+    if (ref === 'previous') this.index = Math.max(0, this.index - 1);
+    if (ref === 'next') this.index = Math.min(this.slides.length - 1, this.index + 1);
+    return previous !== this.index;
   }
+
   view(): Input<EditorReply> {
     const events: { ref: string; kind: string }[] = [];
-    const button = (ref: string, label: string, disabled = false, active = false): string => {
+    const button = (ref: string, label: string, icon: string, disabled = false): string => {
       events.push({ ref, kind: 'click' });
-      return `<button type="button" data-ref="${ref}"${disabled ? ' disabled' : ''}${active ? ' aria-pressed="true"' : ''}>${escape(label)}</button>`;
+      return iconButton(ref, label, icon, disabled);
     };
     let navigation = '', body = this.word;
     if (this.book && this.sheet) {
-      navigation = '<nav class="sheet-tabs" aria-label="工作表">' + this.book.sheets.map((s, i) => button(`sheet-${i}`, s.name, false, i === this.index)).join('') + '</nav>';
-      navigation += '<div class="paging">' + button('rows-previous', '上一页', this.rowPage === 0) + button('rows-next', '下一页', (this.rowPage + 1) * PageRows >= this.sheet.rowCount);
-      navigation += `<span>${this.sheet.rowCount} 行 · ${this.sheet.columnCount} 列 · 第 ${this.rowPage + 1} / ${Math.max(1, Math.ceil(this.sheet.rowCount / PageRows))} 页</span>`;
-      navigation += button('columns-previous', '向左', this.columnPage === 0) + button('columns-next', '向右', (this.columnPage + 1) * PageColumns >= this.sheet.columnCount) + '</div>';
-      body = this.sheet.render(this.rowPage, this.columnPage);
+      navigation = '<nav class="sheet-tabs" aria-label="工作表">' + this.book.sheets.map((s, i) => {
+        events.push({ ref: `sheet-${i}`, kind: 'click' });
+        return `<button type="button" data-ref="sheet-${i}" title="${escape(s.name)}" aria-pressed="${i === this.index}">${escape(s.name)}</button>`;
+      }).join('') + '</nav>';
+      body = this.sheet.render();
     } else if (this.slides.length) {
-      navigation = '<nav class="paging" aria-label="幻灯片">' + button('previous', '上一张', this.index === 0) + `<span>幻灯片 ${this.index + 1} / ${this.slides.length}</span>` + button('next', '下一张', this.index === this.slides.length - 1) + '</nav>';
+      navigation = '<nav class="paging" aria-label="幻灯片">' + button('previous', '上一张', 'left', this.index === 0) + `<span>${this.index + 1} / ${this.slides.length}</span>` + button('next', '下一张', 'right', this.index === this.slides.length - 1) + '</nav>';
       body = slidePage(this.archive, this.slides[this.index]!);
     }
-    const html = `<section class="office-viewer"><header><strong>${escape(basename(this.path))}</strong><span class="muted">只读预览</span>${button('reload', '刷新')}</header>${navigation}<article class="office-content${this.book ? ' workbook' : ''}${this.slides.length ? ' slide' : ''}" data-ref="office-content" data-pencode-selectable data-pencode-searchable aria-label="Office 预览">${body}</article></section>`;
+    const html = `<section class="office-viewer">${navigation ? `<header class="office-toolbar">${navigation}</header>` : ''}<article class="office-content${this.book ? ' workbook' : ''}${this.slides.length ? ' slide' : ''}" data-ref="office-content" data-pencode-selectable data-pencode-searchable data-pencode-preserve-whitespace aria-label="Office 预览">${body}</article></section>`;
     if (Buffer.byteLength(html) > 1800 << 10) throw new Error('当前页面内容超过预览限制（约 1.8 MiB），请拆分文档后重试');
     return { view: { html, css, events } };
   }
@@ -94,17 +92,17 @@ export function createViewer(): (message: EditorMessage) => Promise<Input<Editor
   let document: OfficeDocument | undefined;
   return async message => {
     if (message.editor !== 'office') throw new Error('未知的 Office 编辑工具');
-    if (message.event.kind === 'click' && message.event.ref !== 'reload' && document?.path === message.path) {
-      return document.event(message.event.ref) ? document.view() : {};
-    }
-    if (!['open', 'documentchange'].includes(message.event.kind) && message.event.ref !== 'reload') return {};
     try {
+      if (message.event.kind === 'click' && message.event.ref !== 'reload' && document?.path === message.path) {
+        return document.event(message.event.ref) ? document.view() : {};
+      }
+      if (!['open', 'documentchange'].includes(message.event.kind) && message.event.ref !== 'reload') return {};
       const next = new OfficeDocument(message.path, await readOffice(message.path));
       const reply = next.view(); document = next; return reply;
     } catch (error) {
       document = undefined;
       const detail = error instanceof Error ? error.message : String(error);
-      return { view: { html: `<section class="office-viewer"><h2>无法预览 Office 文件</h2><p>${escape(detail)}</p><p class="muted">支持未加密的 .docx、.xlsx 和 .pptx。旧版 .doc、.xls、.ppt 请先转换为新格式。</p><button type="button" data-ref="reload">重试</button></section>`, css, events: [{ ref: 'reload', kind: 'click' }] } };
+      return { view: { html: `<section class="office-viewer"><header class="office-toolbar"><div class="office-actions"><button type="button" data-ref="reload">重试</button></div></header><article class="office-content office-error"><h2>无法预览</h2><p>${escape(detail)}</p></article></section>`, css, events: [{ ref: 'reload', kind: 'click' }] } };
     }
   };
 }
