@@ -1,0 +1,8 @@
+{
+  "id": "office-viewer",
+  "name": "Office Viewer",
+  "version": "0.1.0",
+  "publisher": "Pencode",
+  "description": "本地只读预览 Word、Excel 和 PowerPoint 文件，支持工作表切换、分页与幻灯片浏览。",
+  "entry": "dist/office-viewer.mjs"
+}
