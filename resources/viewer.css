@@ -1,21 +1,22 @@
-.office-viewer { box-sizing: border-box; width: 100%; min-width: 0; min-height: 100%; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); line-height: 1.6; }
+.office-viewer { position: absolute; inset: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); line-height: 1.6; }
 .office-viewer .muted { color: var(--vscode-descriptionForeground); }
-.office-toolbar { display: flex; align-items: flex-start; gap: 8px; box-sizing: border-box; min-height: 36px; padding: 4px 8px; border-bottom: 1px solid var(--vscode-editorGroup-border); }
+.office-toolbar { display: flex; flex-shrink: 0; align-items: flex-start; gap: 8px; box-sizing: border-box; min-height: 36px; padding: 4px 8px; border-bottom: 1px solid var(--vscode-editorGroup-border); }
 .office-viewer button { box-sizing: border-box; flex-shrink: 0; margin: 0; padding: 4px 10px; border: 0; border-radius: 3px; color: var(--vscode-editor-foreground); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
 .office-viewer button:hover { background: var(--vscode-toolbar-hoverBackground); }
 .office-viewer button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 .office-viewer button:disabled { opacity: 0.4; background: transparent; cursor: default; }
-.office-viewer .sheet-tabs button[aria-pressed="true"] { color: var(--vscode-button-foreground); background: var(--vscode-button-background); border-bottom-color: var(--vscode-focusBorder); font-weight: 600; }
 .office-viewer .icon-button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 6px; color: var(--vscode-icon-foreground); }
 .office-icon { position: relative; display: block; box-sizing: border-box; width: 7px; height: 7px; border-top: 1.5px solid currentColor; border-right: 1.5px solid currentColor; }
 .office-icon.right { transform: rotate(45deg); }
 .office-icon.left { transform: rotate(225deg); }
 .office-actions { display: flex; margin-left: auto; }
-.office-viewer .sheet-tabs { display: flex; flex: 1 1 160px; min-width: 0; gap: 2px; overflow: auto; }
-.office-viewer .sheet-tabs button { max-width: 180px; border-bottom: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.office-viewer .sheet-tabs { display: flex; flex: 1 1 160px; min-width: 0; gap: 0px; overflow: auto; background: var(--vscode-editorGroupHeader-tabsBackground); }
+.office-viewer .sheet-tabs button { max-width: 180px; border-radius: 0; border-top: 2px solid transparent; border-right: 1px solid var(--vscode-tab-border); color: var(--vscode-tab-inactiveForeground); background: var(--vscode-tab-inactiveBackground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.office-viewer .sheet-tabs button:hover { background: var(--vscode-tab-hoverBackground); }
+.office-viewer .sheet-tabs button[aria-pressed="true"] { color: var(--vscode-tab-activeForeground); background: var(--vscode-tab-activeBackground); border-top-color: var(--vscode-tab-activeBorder); font-weight: 600; }
 .office-viewer .paging { display: flex; flex-shrink: 0; align-items: center; gap: 2px; }
 .office-viewer .paging span { color: var(--vscode-descriptionForeground); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.office-content { box-sizing: border-box; width: 100%; min-width: 0; margin: 0; padding: 16px 20px; overflow: auto; overflow-wrap: break-word; user-select: text; }
+.office-content { flex: 1; box-sizing: border-box; width: 100%; min-width: 0; min-height: 0; margin: 0; padding: 16px 20px; overflow: auto; overflow-wrap: break-word; user-select: text; }
 .office-content p { min-height: 1em; margin: 0 0 12px; white-space: pre-wrap; }
 .office-content .list-item { padding-left: 20px; }
 .office-content img { display: block; max-width: 100%; height: auto; margin: 16px 0; }
@@ -24,10 +25,15 @@
 .office-content th { background: var(--vscode-editorWidget-background); font-weight: 600; }
 .office-content td p { margin: 0; }
 .office-content.workbook { padding: 0; }
-.office-content.workbook > .muted { padding: 16px 20px; }
-.office-content .sheet { margin: 0; }
-.office-content .sheet td { min-width: 96px; max-width: 320px; white-space: pre-wrap; }
-.office-content .sheet th { white-space: nowrap; }
+.office-content .sheet { table-layout: fixed; margin: 0; }
+.office-content .sheet th, .office-content .sheet td { box-sizing: border-box; height: 20px; padding: 0 6px; line-height: 20px; overflow: hidden; white-space: pre; overflow-wrap: normal; }
+.office-content .sheet td:empty { overflow: visible; }
 .office-error h2 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
 .office-error p { color: var(--vscode-descriptionForeground); }
 .office-content, .office-viewer .sheet-tabs { scrollbar-width: thin; scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }
+
+/* Grid children are supplied by the host for the current two-axis window. */
+.office-content .sheet-grid { position: relative; margin: 0; }
+.office-content .pencode-grid-cell { position: absolute; box-sizing: border-box; padding: 0 6px; border-right: 1px solid var(--vscode-editorGroup-border); border-bottom: 1px solid var(--vscode-editorGroup-border); line-height: 20px; white-space: pre; overflow: hidden; overflow-wrap: normal; }
+.office-content .pencode-grid-cell:empty { overflow: visible; }
+.office-content .pencode-grid-header { background: var(--vscode-editorWidget-background); font-weight: 600; }
