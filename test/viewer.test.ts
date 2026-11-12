@@ -116,9 +116,10 @@ test('PowerPoint follows presentation order and excludes external images', () =>
   assert.equal(document.event('next'), false);
 });
 test('viewer retries corrupt files and refreshes without modifying the Office source', async () => {
+  const abort = new AbortController();
   const directory = await mkdtemp(join(tmpdir(), 'pencode-office-'));
   try {
-    const path = join(directory, 'a.docx'), handle = createViewer();
+    const path = join(directory, 'a.docx'), handle = createViewer(abort.signal);
     await writeFile(path, 'not a zip');
     assert.match((await handle(message(path))).view!.html!, /无法预览/);
     const before = word('原始内容'); await writeFile(path, before);
@@ -127,6 +128,8 @@ test('viewer retries corrupt files and refreshes without modifying the Office so
     assert.deepEqual(await handle(message(path, 'click', 'unknown')), {});
     await writeFile(path, word('新内容'));
     assert.match((await handle(message(path, 'documentchange'))).view!.html!, /新内容/);
+    abort.abort();
+    await assert.rejects(handle(message(path)));
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 test('rejects DTDs, malformed XML and missing document parts', () => {
@@ -150,6 +153,37 @@ test('bundled JavaScript serves PEB requests under the actual host runtime', asy
     const response = await reader.read(); assert.equal(response?.id, 2); assert.equal(response?.kind, Kind.EditorResponse);
     const reply = decode(EditorReplyCodec, response!.payload);
     assert.match(reply.view!.html, /真实进程/); assert.equal(reply.content, null);
+    await writer.send(Kind.Shutdown, 0); assert.equal(await exited, 0);
+  } finally { child.kill(); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('one Office process keeps navigation independent for two views of the same file', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pencode-office-sessions-'));
+  const child = spawn(process.execPath, ['dist/office-viewer.mjs'], { stdio: ['pipe', 'pipe', 'inherit'] });
+  const exited = new Promise<number | null>((resolve, reject) => { child.once('exit', resolve); child.once('error', reject); });
+  const reader = new Reader(child.stdout), writer = new Writer(child.stdin);
+  try {
+    const path = join(directory, 'same.pptx');
+    await writeFile(path, zip({
+      'ppt/presentation.xml': '<p:presentation><p:sldIdLst><p:sldId r:id="one"/><p:sldId r:id="two"/></p:sldIdLst></p:presentation>',
+      'ppt/_rels/presentation.xml.rels': '<Relationships><Relationship Id="one" Target="slides/slide1.xml"/><Relationship Id="two" Target="slides/slide2.xml"/></Relationships>',
+      'ppt/slides/slide1.xml': '<p:sld><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>独立第一张</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>',
+      'ppt/slides/slide2.xml': '<p:sld><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>独立第二张</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>',
+    }));
+    const request = async (session: number, kind = 'open', ref = '') => {
+      await writer.send(Kind.EditorRequest, 2, encode(EditorMessageCodec, message(path, kind, ref)), session);
+      const response = await reader.read(); assert.equal(response?.session, session); assert.equal(response?.kind, Kind.EditorResponse);
+      return decode(EditorReplyCodec, response!.payload);
+    };
+    for (const session of [1, 2]) {
+      await writer.send(Kind.Initialize, 1, encode(HelloCodec, { capabilities: 1023 }), session);
+      assert.equal((await reader.read())?.session, session);
+      assert.match((await request(session)).view!.html, /独立第一张/);
+      if (session === 1) assert.match((await request(1, 'click', 'next')).view!.html, /独立第二张/);
+    }
+    assert.equal((await request(1, 'click', 'next')).view, null);
+    await writer.send(Kind.Shutdown, 0, undefined, 1);
+    assert.match((await request(2, 'click', 'next')).view!.html, /独立第二张/);
     await writer.send(Kind.Shutdown, 0); assert.equal(await exited, 0);
   } finally { child.kill(); await rm(directory, { recursive: true, force: true }); }
 });

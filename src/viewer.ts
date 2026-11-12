@@ -84,9 +84,12 @@ export class OfficeDocument {
     return { view: { html, css, events } };
   }
 }
-export function createViewer(): (message: EditorMessage) => Promise<Input<EditorReply>> {
+export function createViewer(signal: AbortSignal): (message: EditorMessage) => Promise<Input<EditorReply>> {
+  signal.throwIfAborted();
   let document: OfficeDocument | undefined;
+  signal.addEventListener('abort', () => { document?.close(); document = undefined; }, { once: true });
   return async message => {
+    signal.throwIfAborted();
     if (message.editor !== 'office') throw new Error('未知的 Office 编辑工具');
     try {
       if (message.event.kind === 'grid' && document?.path === message.path) return document.chunk(message.event.ref, message.event.value);
