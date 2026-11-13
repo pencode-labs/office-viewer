@@ -1,6 +1,6 @@
 # Office Viewer
 
-使用 TypeScript 开发的 Pencode 只读 Office 预览插件，通过 peb v18 在工作区主机运行。作为独立 Git 子模块维护，主仓库保留插件版本引用。
+使用 TypeScript 开发的 Pencode 只读 Office 预览插件，通过 peb v20 在工作区主机运行。作为独立 Git 子模块维护，主仓库保留插件版本引用。
 
 - **Word `.docx`**：正文、标题、粗体、斜体、下划线、列表、表格和内嵌图片；正文按需解析、分段渲染，大段落和大表格也能分段浏览。
 - **Excel `.xlsx`**：工作表切换、共享字符串、内联字符串、公式缓存值、常见日期与百分比格式；读取保存的列宽、行高、单元格对齐与自动换行设置，当前工作表建立轻量行索引，按可视行列解析并分块传输数据，以二维虚拟滚动浏览全部行列，只挂载可视区域及缓冲区，保留至少 100 行、26 列的空白网格范围，选中的工作表以主题强调色高亮。
@@ -45,3 +45,21 @@ npm run package
 `npm run build && npm test` 覆盖三种文件解析、XML 转义、工作表与幻灯片切换、损坏文件重试、只读行为、超过原 1.8 MiB 限制的表格和文档、分块传输与实际 Node 子进程上的 peb 会话。主仓库的 `server/extensionhost` 测试还验证该插件可被 Go 宿主注册。
 
 MIT；图标来自 Lucide，许可证见 `resources/LUCIDE-LICENSE.txt`。
+
+## 自动发布与下载
+
+推送 `v0.1.0` 等版本 tag 后，GitHub Actions 使用固定版本的 PEB v20 SDK，
+安装锁定依赖、构建并测试，再自动创建 GitHub Release。预发布 tag（如
+`v0.2.0-rc.1`）会创建预发布版本。
+
+附件统一为 `office-viewer-<tag>-<os>-<arch>.zip`，支持 `linux`、`darwin`、
+`windows`，各提供 `amd64`、`arm64`，并附 `SHA256SUMS`。各平台共用打包后的
+JavaScript，ZIP 仅包含顶层 `office-viewer/` 目录，内有 `dist/`、`resources/`、
+`package.json`、README 和许可证；清单及 package.json 版本与 tag 一致。
+
+下载工作区服务端对应的平台包，直接解压到 `~/.pencode/extensions/`（Windows 为
+`%USERPROFILE%/.pencode/extensions/`），得到
+`~/.pencode/extensions/office-viewer/resources/extension.json`，重启 Pencode
+即可发现扩展。远程工作区请在远端解压，也可在扩展管理器选择解压后的
+`office-viewer/` 目录安装。运行主机需提供 Node.js 22+ 或 Bun，无需 npm、
+node_modules、编译器或 Office。

@@ -1,0 +1,98 @@
+name: Release extension
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: extension-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pencode/extensions/office-viewer
+    steps:
+      # Keep the file:../../peb/ts dependency at its source-relative location.
+      - uses: actions/checkout@v4
+        with:
+          repository: pencode-labs/pencode
+          ref: 5ecb4c35d7bf19c17d3f3a59f8e05d92880ade99 # v0.1.0-rc.5, PEB v20
+          sparse-checkout: peb/ts
+          path: pencode
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          path: pencode/extensions/office-viewer
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: pencode/extensions/office-viewer/package-lock.json
+      - name: Validate release tag
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: Build extension archives
+        shell: python3 {0}
+        run: |
+          import hashlib
+          import itertools
+          import json
+          import os
+          from pathlib import Path
+          import shutil
+
+          tag = os.environ['RELEASE_TAG']
+          manifest = json.loads(Path('resources/extension.json').read_text())
+          staging = Path('release/staging')
+          package = staging / manifest['id']
+          shutil.rmtree('release', ignore_errors=True)
+          for name in ('dist', 'resources'):
+              shutil.copytree(name, package / name)
+          for name in ('LICENSE', 'README.md', 'package.json'):
+              shutil.copy2(name, package / name)
+          manifest['version'] = tag.removeprefix('v')
+          (package / 'resources/extension.json').write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          metadata = json.loads((package / 'package.json').read_text())
+          metadata['version'] = manifest['version']
+          (package / 'package.json').write_text(
+              json.dumps(metadata, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          checksums = []
+          for goos, goarch in itertools.product(('linux', 'darwin', 'windows'), ('amd64', 'arm64')):
+              archive = Path(shutil.make_archive(
+                  str(Path('release') / f"{manifest['id']}-{tag}-{goos}-{goarch}"),
+                  'zip', staging, manifest['id']))
+              with archive.open('rb') as stream:
+                  checksum = hashlib.file_digest(stream, 'sha256').hexdigest()
+              checksums.append(f'{checksum}  {archive.name}\n')
+          shutil.rmtree(staging)
+          Path('release/SHA256SUMS').write_text(''.join(checksums), encoding='utf-8')
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          (cd release && sha256sum --check SHA256SUMS)
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release/*.zip release/SHA256SUMS --clobber
+          else
+            flags=(--verify-tag --generate-notes)
+            if [[ "${RELEASE_TAG#v}" == *-* ]]; then
+              flags+=(--prerelease)
+            fi
+            gh release create "$RELEASE_TAG" release/*.zip release/SHA256SUMS "${flags[@]}"
+          fi
