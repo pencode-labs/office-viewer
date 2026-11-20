@@ -26,6 +26,28 @@ test('Word preserves inline order, formatting, tables and escapes file text', ()
   assert.doesNotMatch(view.view!.html!, /<script>/);
   assert.match(view.view!.html!, /data-pencode-searchable/);
 });
+test('Word styles and PowerPoint run properties render as text layout styles', () => {
+  const docx = zip({
+    'word/styles.xml': '<w:styles><w:style w:styleId="BodyText"><w:rPr><w:rFonts w:ascii="仿宋"/><w:sz w:val="28"/><w:color w:val="C00000"/></w:rPr></w:style></w:styles>',
+    'word/document.xml': '<w:document><w:body><w:p><w:pPr><w:pStyle w:val="BodyText"/><w:jc w:val="center"/><w:ind w:left="720" w:firstLine="360"/><w:spacing w:before="240" w:after="120" w:line="360"/></w:pPr><w:r><w:rPr><w:rStyle w:val="BodyText"/><w:b/><w:u w:val="double"/><w:vertAlign w:val="superscript"/></w:rPr><w:t>样式文字</w:t></w:r></w:p></w:body></w:document>',
+  });
+  const wordView = html(new OfficeDocument('/styled.docx', docx));
+  assert.match(wordView, /font-family:'仿宋';font-size:14pt;color:#c00000;/);
+  assert.match(wordView, /font-weight|<strong>/);
+  assert.match(wordView, /text-decoration-style:double/);
+  assert.match(wordView, /vertical-align:super/);
+  assert.match(wordView, /text-align:center/);
+  assert.match(wordView, /margin-left:36pt/);
+  const pptx = zip({
+    'ppt/presentation.xml': '<p:presentation><p:sldIdLst><p:sldId r:id="one"/></p:sldIdLst></p:presentation>',
+    'ppt/_rels/presentation.xml.rels': '<Relationships><Relationship Id="one" Target="slides/slide.xml"/></Relationships>',
+    'ppt/slides/slide.xml': '<p:sld><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:pPr algn="ctr"/><a:r><a:rPr b="1" i="1" u="dbl" sz="2800" baseline="30000"><a:latin typeface="Aptos"/><a:solidFill><a:srgbClr val="00A2FF"/></a:solidFill></a:rPr><a:t>PPT 样式</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>',
+  });
+  const pptView = html(new OfficeDocument('/styled.pptx', pptx));
+  assert.match(pptView, /font-family:'Aptos';font-size:28pt;color:#00a2ff;vertical-align:super/);
+  assert.match(pptView, /<strong><em><u>PPT 样式<\/u><\/em><\/strong>/);
+  assert.match(pptView, /text-align:center/);
+});
 test('Excel resolves relationships, strings, cached formulas, dates and all sparse rows and columns without paging', () => {
   const data = zip({
     'xl/workbook.xml': '<workbook><sheets><sheet name="数据 &amp; 汇总" r:id="r1"/><sheet name="另一个表" r:id="r2"/><sheet name="hidden" state="hidden" r:id="r3"/></sheets></workbook>',
@@ -41,7 +63,8 @@ test('Excel resolves relationships, strings, cached formulas, dates and all spar
   assert.ok(first.includes('数据 &amp; 汇总'));
   assert.doesNotMatch(first, /<t[dh]\b/);
   assert.doesNotMatch(first, /sheet-2/);
-  assert.doesNotMatch(first, /paging|rows-next|columns-next|office-actions|data-ref="reload"/);
+  assert.doesNotMatch(first, /paging|rows-next|columns-next|office-actions|office-readonly|data-ref="reload"/);
+  assert.doesNotMatch(first, /office-file-mark|book\.xlsx|只读预览/);
   assert.match(first, /data-ref="sheet-0"[^>]*aria-pressed="true"/);
   assert.match(first, /data-pencode-selectable data-pencode-searchable data-pencode-preserve-whitespace/);
   assert.equal(document.event('next'), false);
@@ -110,9 +133,16 @@ test('PowerPoint follows presentation order and excludes external images', () =>
     'ppt/slides/_rels/slide2.xml.rels': '<Relationships><Relationship Id="external" Target="https://example.test/private.png" TargetMode="External"/></Relationships>',
   });
   const document = new OfficeDocument('/slides.pptx', data);
-  assert.match(html(document), /第二张/); assert.doesNotMatch(html(document), /https:/);
+  const first = document.view();
+  assert.deepEqual(first.view?.events, [{ ref: 'slide-0', kind: 'click' }, { ref: 'slide-1', kind: 'click' }]);
+  assert.match(first.view!.html!, /data-ref="slide-0"[^>]*aria-pressed="true"/);
+  assert.match(first.view!.html!, /<article[^>]*>.*第二张/);
+  assert.doesNotMatch(first.view!.html!, /https:/);
   assert.equal(document.event('previous'), false);
-  assert.equal(document.event('next'), true); assert.match(html(document), /第一张/);
+  assert.equal(document.event('slide-1'), true);
+  assert.match(html(document), /data-ref="slide-1"[^>]*aria-pressed="true"/);
+  assert.match(html(document), /<article[^>]*>.*第一张/);
+  assert.equal(document.event('slide-99'), false);
   assert.equal(document.event('next'), false);
 });
 test('viewer retries corrupt files and refreshes without modifying the Office source', async () => {
@@ -148,11 +178,67 @@ test('bundled JavaScript serves PEB requests under the actual host runtime', asy
     const registered = await reader.read(); assert.equal(registered?.kind, Kind.Register);
     const contributions = decode(ContributionsCodec, registered!.payload);
     assert.equal(contributions.actions[0]?.default, true); assert.equal(contributions.actionService, false);
-    const path = join(directory, 'test.docx'); await writeFile(path, word('真实进程'));
-    await writer.send(Kind.EditorRequest, 2, encode(EditorMessageCodec, message(path)));
-    const response = await reader.read(); assert.equal(response?.id, 2); assert.equal(response?.kind, Kind.EditorResponse);
-    const reply = decode(EditorReplyCodec, response!.payload);
-    assert.match(reply.view!.html, /真实进程/); assert.equal(reply.content, null);
+    const docx = join(directory, 'test.docx');
+    const w = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    const relationships = 'http://schemas.openxmlformats.org/package/2006/relationships';
+    await writeFile(docx, zip({
+      '_rels/.rels': `<Relationships xmlns="${relationships}"><Relationship Id="r1" Type="${r}/officeDocument" Target="word/document.xml"/></Relationships>`,
+      'word/document.xml': `<w:document xmlns:w="${w}"><w:body>
+        <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>真实进程</w:t></w:r></w:p>
+        <w:p><w:r><w:br w:type="page"/></w:r></w:p>
+        <w:p><w:r><w:t>第二页</w:t></w:r></w:p>
+        <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1080" w:right="1680" w:bottom="1008" w:left="1180"/></w:sectPr>
+      </w:body></w:document>`,
+    }));
+    const pptx = join(directory, 'test.pptx');
+    const p = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+    const a = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const slide = (content: string) => `<p:sld xmlns:p="${p}" xmlns:a="${a}">
+      <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="E8F0FB"/></a:solidFill></p:bgPr></p:bg>
+      <p:spTree><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="4572000" cy="914400"/></a:xfrm></p:spPr>
+      <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="3200"><a:latin typeface="Arial"/><a:ea typeface="Missing Office Font"/></a:rPr><a:t>${content}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>`;
+    await writeFile(pptx, zip({
+      '_rels/.rels': `<Relationships xmlns="${relationships}"><Relationship Id="r1" Type="${r}/officeDocument" Target="ppt/presentation.xml"/></Relationships>`,
+      '[Content_Types].xml': '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/></Types>',
+      'ppt/presentation.xml': `<p:presentation xmlns:p="${p}" xmlns:r="${r}"><p:sldIdLst><p:sldId id="256" r:id="r1"/><p:sldId id="257" r:id="r2"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>`,
+      'ppt/_rels/presentation.xml.rels': `<Relationships xmlns="${relationships}"><Relationship Id="r1" Type="${r}/slide" Target="slides/slide1.xml"/><Relationship Id="r2" Type="${r}/slide" Target="slides/slide2.xml"/></Relationships>`,
+      'ppt/slides/slide1.xml': slide('PPT 甲'),
+      'ppt/slides/slide2.xml': slide('PPT 乙'),
+    }));
+    let id = 1;
+    const exchange = async (path: string, kind = 'open', ref = '') => {
+      await writer.send(Kind.EditorRequest, ++id, encode(EditorMessageCodec, message(path, kind, ref)));
+      const response = await reader.read();
+      assert.equal(response?.id, id);
+      assert.equal(response?.kind, Kind.EditorResponse);
+      const reply = decode(EditorReplyCodec, response!.payload);
+      assert.equal(reply.content, null);
+      return reply.view!.html;
+    };
+    const wordView = await exchange(docx);
+    assert.equal((wordView.match(/class="word-paper"/g) ?? []).length, 2);
+    assert.match(wordView, /width:793\.73px;/);
+    assert.match(wordView, /padding-left:78\.67px/);
+    assert.match(wordView, /text-align:center[^>]*>.*真实进程/);
+    const png = (view: string) => Buffer.from(view.match(/class="presentation-image" src="data:image\/png;base64,([^"]+)"/)![1]!, 'base64');
+    const slideView = await exchange(pptx);
+    assert.doesNotMatch(slideView, /office-toolbar/);
+    assert.match(slideView, /<footer class="presentation-controls">.*data-ref="slide-text".*<\/footer><\/aside>/);
+    const thumbnails = [...slideView.matchAll(/class="presentation-thumbnail"[^>]*><img src="([^"]+)"/g)];
+    assert.equal(thumbnails.length, 2);
+    assert.ok(thumbnails[0]![1] !== thumbnails[1]![1], 'different Chinese glyphs must produce different thumbnails');
+    const firstSlide = png(slideView);
+    assert.equal(firstSlide.readUInt32BE(16) / firstSlide.readUInt32BE(20), 4 / 3);
+    const secondSlide = await exchange(pptx, 'click', 'slide-1');
+    assert.match(secondSlide, /data-ref="slide-1"[^>]*aria-pressed="true"/);
+    assert.ok(!png(secondSlide).equals(firstSlide), 'different Chinese glyphs must produce different slides');
+    assert.match(await exchange(pptx, 'click', 'slide-text'), /presentation-text.*PPT 乙/);
+    assert.deepEqual(png(await exchange(pptx, 'click', 'slide-text')), png(secondSlide));
+    await exchange(pptx, 'click', 'slide-text');
+    assert.match(await exchange(pptx, 'click', 'slide-0'), /data-ref="slide-text" aria-pressed="true"/);
+    assert.deepEqual(png(await exchange(pptx, 'click', 'slide-text')), firstSlide);
     await writer.send(Kind.Shutdown, 0); assert.equal(await exited, 0);
   } finally { child.kill(); await rm(directory, { recursive: true, force: true }); }
 });
@@ -178,12 +264,12 @@ test('one Office process keeps navigation independent for two views of the same 
     for (const session of [1, 2]) {
       await writer.send(Kind.Initialize, 1, encode(HelloCodec, { capabilities: 1023 }), session);
       assert.equal((await reader.read())?.session, session);
-      assert.match((await request(session)).view!.html, /独立第一张/);
-      if (session === 1) assert.match((await request(1, 'click', 'next')).view!.html, /独立第二张/);
+      assert.match((await request(session)).view!.html, /<article[^>]*>.*独立第一张/s);
+      if (session === 1) assert.match((await request(1, 'click', 'slide-1')).view!.html, /<article[^>]*>.*独立第二张/s);
     }
-    assert.equal((await request(1, 'click', 'next')).view, null);
+    assert.equal((await request(1, 'click', 'slide-1')).view, null);
     await writer.send(Kind.Shutdown, 0, undefined, 1);
-    assert.match((await request(2, 'click', 'next')).view!.html, /独立第二张/);
+    assert.match((await request(2, 'click', 'slide-1')).view!.html, /<article[^>]*>.*独立第二张/s);
     await writer.send(Kind.Shutdown, 0); assert.equal(await exited, 0);
   } finally { child.kill(); await rm(directory, { recursive: true, force: true }); }
 });

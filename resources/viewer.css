@@ -1,6 +1,7 @@
-.office-viewer { position: absolute; inset: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); line-height: 1.6; }
+.office-viewer { --office-ink: #202124; --office-workspace: var(--vscode-editor-background); position: absolute; inset: 0; display: flex; flex-direction: column; box-sizing: border-box; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); line-height: 1.6; }
 .office-viewer .muted { color: var(--vscode-descriptionForeground); }
-.office-toolbar { display: flex; flex-shrink: 0; align-items: flex-start; gap: 8px; box-sizing: border-box; min-height: 36px; padding: 4px 8px; border-bottom: 1px solid var(--vscode-editorGroup-border); }
+.office-toolbar { display: flex; flex-shrink: 0; align-items: center; gap: 14px; box-sizing: border-box; min-height: 48px; padding: 6px 14px; border-bottom: 1px solid var(--vscode-editorGroup-border); background: var(--vscode-titleBar-activeBackground, var(--vscode-editor-background)); }
+.office-toolbar-navigation { display: flex; flex: 1 1 auto; align-items: center; justify-content: center; min-width: 0; }
 .office-viewer button { box-sizing: border-box; flex-shrink: 0; margin: 0; padding: 4px 10px; border: 0; border-radius: 3px; color: var(--vscode-editor-foreground); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
 .office-viewer button:hover { background: var(--vscode-toolbar-hoverBackground); }
 .office-viewer button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
@@ -10,27 +11,87 @@
 .office-icon.right { transform: rotate(45deg); }
 .office-icon.left { transform: rotate(225deg); }
 .office-actions { display: flex; margin-left: auto; }
-.office-viewer .sheet-tabs { display: flex; flex: 1 1 160px; min-width: 0; gap: 0px; overflow: auto; background: var(--vscode-editorGroupHeader-tabsBackground); }
-.office-viewer .sheet-tabs button { max-width: 180px; border-radius: 0; border-top: 2px solid transparent; border-right: 1px solid var(--vscode-tab-border); color: var(--vscode-tab-inactiveForeground); background: var(--vscode-tab-inactiveBackground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.office-viewer .sheet-tabs { display: flex; flex: 1 1 160px; align-items: center; min-width: 0; gap: 2px; overflow: auto; }
+.office-viewer .sheet-tabs button { max-width: 180px; padding: 4px 14px; color: var(--vscode-tab-inactiveForeground); line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .office-viewer .sheet-tabs button:hover { background: var(--vscode-tab-hoverBackground); }
-.office-viewer .sheet-tabs button[aria-pressed="true"] { color: var(--vscode-tab-activeForeground); background: var(--vscode-tab-activeBackground); border-top-color: var(--vscode-tab-activeBorder); font-weight: 600; }
+.office-viewer .sheet-tabs button[aria-pressed="true"] { color: var(--vscode-list-activeSelectionForeground); background: var(--vscode-list-activeSelectionBackground); font-weight: 600; }
 .office-viewer .paging { display: flex; flex-shrink: 0; align-items: center; gap: 2px; }
 .office-viewer .paging span { color: var(--vscode-descriptionForeground); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.office-toolbar-navigation > .paging + .paging { margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--vscode-editorGroup-border); }
 .office-content { flex: 1; box-sizing: border-box; width: 100%; min-width: 0; min-height: 0; margin: 0; padding: 16px 20px; overflow: auto; overflow-wrap: break-word; user-select: text; }
-.office-content p { min-height: 1em; margin: 0 0 12px; white-space: pre-wrap; }
-.office-content .list-item { padding-left: 20px; }
-.office-content img { display: block; max-width: 100%; height: auto; margin: 16px 0; }
-.office-content table { border-spacing: 0; border-collapse: collapse; margin: 0 0 16px; }
-.office-content th, .office-content td { padding: 6px 12px; border: 1px solid var(--vscode-editorGroup-border); vertical-align: top; }
-.office-content th { background: var(--vscode-editorWidget-background); font-weight: 600; }
-.office-content td p { margin: 0; }
 .office-content.workbook { padding: 0; }
-.office-content .sheet { table-layout: fixed; margin: 0; }
-.office-content .sheet th, .office-content .sheet td { box-sizing: border-box; height: 20px; padding: 0 6px; line-height: 20px; overflow: hidden; white-space: pre; overflow-wrap: normal; }
+.office-content.word { padding: 18px; background: var(--office-workspace); }
+.office-viewer .word-paper-wrapper { display: block; padding: 0; background: transparent; }
+.office-viewer .word-paper-wrapper > section.word-paper, .office-viewer .word-fallback {
+  box-sizing: border-box; margin: 0 auto 16px; color: var(--office-ink); background: #fff;
+  box-shadow: 0 2px 8px #0004; font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size: 14.67px; line-height: normal;
+}
+.office-viewer .word-paper-wrapper > section.word-paper:last-child { margin-bottom: 0; }
+.office-viewer .word-paper-wrapper > section.word-paper { width: 816px; min-height: 1056px; padding: 96px; }
+.office-viewer .word-fallback { width: 100%; max-width: 816px; min-height: 720px; padding: 36px; }
+.office-viewer .word-paper img { display: inline-block; }
+.word-fallback td, .presentation-text td { padding: 4px 8px; border: 1px solid #c6cbd2; }
+.word-fallback table, .presentation-text table { border-collapse: collapse; }
+.word-fallback img, .presentation-text img { display: block; max-width: 100%; height: auto; }
+.presentation-workspace { flex: 1; display: flex; min-height: 0; min-width: 0; background: var(--office-workspace); }
+.presentation-sidebar {
+  flex: 0 0 184px; display: flex; flex-direction: column; min-height: 0; min-width: 0; box-sizing: border-box;
+  background: var(--vscode-sideBar-background); border-right: 1px solid var(--vscode-editorGroup-border);
+}
+.presentation-list { flex: 1; min-height: 0; padding: 8px; overflow: auto; }
+.presentation-controls { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; padding: 4px; border-top: 1px solid var(--vscode-editorGroup-border); }
+.office-viewer .presentation-entry {
+  display: flex; align-items: flex-start; gap: 6px; width: 100%; margin: 0 0 4px;
+  padding: 6px 5px; color: var(--vscode-editor-foreground); text-align: left;
+}
+.office-viewer .presentation-entry[aria-pressed="true"], .office-viewer .slide-mode[aria-pressed="true"] {
+  color: var(--vscode-list-activeSelectionForeground); background: var(--vscode-list-activeSelectionBackground);
+}
+.slide-number { flex: 0 0 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.presentation-thumbnail { display: block; flex: 1; min-width: 0; overflow: hidden; color: var(--office-ink); background: #fff; }
+.presentation-thumbnail > img, .presentation-image { display: block; width: 100%; height: 100%; object-fit: contain; }
+.presentation-thumbnail > span { display: block; margin: 2px 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 9px; }
+.presentation-stage { flex: 1; position: relative; min-width: 0; min-height: 0; }
+.office-content.slide, .office-content.slide-text { position: absolute; inset: 0; height: 100%; padding: 16px; }
+.office-content.slide { overflow: hidden; }
+.presentation-text { box-sizing: border-box; max-width: 816px; min-height: 100%; margin: 0 auto; padding: 28px; color: var(--office-ink); background: #fff; }
+.presentation-text p, .word-fallback p { white-space: pre-wrap; }
+.office-viewer.powerpoint { container-type: inline-size; }
+.office-viewer.excel .office-toolbar {
+  align-items: flex-start; gap: 8px; min-height: 0; padding: 0 8px; background: transparent;
+}
+.office-viewer.excel .office-toolbar-navigation { justify-content: flex-start; }
+.office-viewer.excel .sheet-tabs {
+  align-items: stretch; gap: 0; background: var(--vscode-editorGroupHeader-tabsBackground);
+}
+.office-viewer.excel .sheet-tabs button {
+  border-radius: 0; border-top: 2px solid transparent; border-right: 1px solid var(--vscode-tab-border);
+  color: var(--vscode-tab-inactiveForeground); background: var(--vscode-tab-inactiveBackground);
+}
+.office-viewer.excel .sheet-tabs button[aria-pressed="true"] {
+  color: var(--vscode-tab-activeForeground); background: var(--vscode-tab-activeBackground);
+  border-top-color: var(--vscode-tab-activeBorder);
+}
+@container (max-width: 650px) {
+  .presentation-sidebar { flex-basis: 96px; }
+  .presentation-list { padding: 5px; }
+  .presentation-controls .icon-button { width: 20px; }
+  .office-viewer .presentation-entry { gap: 3px; padding: 4px 2px; }
+  .slide-number { flex-basis: 12px; }
+  .presentation-thumbnail { max-height: 72px; }
+  .office-content.slide, .office-content.slide-text { padding: 8px; }
+}
+.office-content .sheet { table-layout: fixed; border-spacing: 0; border-collapse: collapse; margin: 0; }
+.office-content .sheet th, .office-content .sheet td { border: 1px solid var(--vscode-editorGroup-border); vertical-align: top; box-sizing: border-box; height: 20px; padding: 0 6px; line-height: 20px; overflow: hidden; white-space: pre; overflow-wrap: normal; }
+.office-content .sheet th { background: var(--vscode-editorWidget-background); font-weight: 600; }
 .office-content .sheet td:empty { overflow: visible; }
 .office-error h2 { margin: 0 0 8px; font-size: 14px; font-weight: 500; }
 .office-error p { color: var(--vscode-descriptionForeground); }
 .office-content, .office-viewer .sheet-tabs { scrollbar-width: thin; scrollbar-color: var(--vscode-scrollbarSlider-background) transparent; }
+.office-content.word, .presentation-list { scrollbar-width: thin; scrollbar-color: #777 transparent; }
+@media (max-width: 700px) {
+  .office-toolbar { gap: 8px; padding: 6px 8px; }
+}
 
 /* Grid children are supplied by the host for the current two-axis window. */
 .office-content .sheet-grid { position: relative; margin: 0; }

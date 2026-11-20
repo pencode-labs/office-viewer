@@ -1,5 +1,5 @@
 import { posix } from 'node:path';
-import { inflateSync } from 'fflate';
+import { inflateSync, zipSync } from 'fflate';
 import { openSync, closeSync, fstatSync, readSync } from 'node:fs';
 import { parseXml, validateXml } from './xml.js';
 
@@ -45,7 +45,10 @@ export class Archive {
         if (!info.isFile() || info.size > 32 << 20) throw new Error('Office 预览只支持不超过 32 MiB 的普通文件');
         this.size = info.size;
       } catch (error) { this.close(); throw error; }
-    } else { this.data = source; this.size = source.length; }
+    } else {
+      if (source.length > 32 << 20) throw new Error('Office 预览只支持不超过 32 MiB 的普通文件');
+      this.data = source; this.size = source.length;
+    }
     try { this.index(); } catch (error) { this.close(); throw error; }
   }
   close(): void { if (this.fd !== undefined) { closeSync(this.fd); this.fd = undefined; } this.data = undefined; }
@@ -107,6 +110,23 @@ export class Archive {
     return source;
   }
   xml(path: string, required = true): XmlNode[] { return parseXml(this.source(path, required)); }
+  rendererPackage(root: 'word' | 'ppt'): Uint8Array {
+    const parts: Record<string, Uint8Array> = Object.create(null);
+    for (const [name, entry] of this.files) {
+      if (name !== '[Content_Types].xml' && name !== '_rels/.rels' && !name.startsWith(root + '/') && !name.startsWith('docProps/')) continue;
+      if (name.endsWith('/') || name !== posix.normalize(name) || /[\\\0?#]/.test(name)) continue;
+      if (/\.(xml|rels)$/i.test(name)) {
+        if (entry.size > 8 << 20) throw new Error('单个 Office XML 超过 8 MiB 预览限制');
+        const data = this.load(name)!;
+        validateXml(utf8.decode(data), name);
+        parts[name] = data;
+      } else if (root === 'ppt' || (entry.size <= 256 << 10 && /\.(png|jpe?g)$/i.test(name))) {
+        parts[name] = this.load(name)!;
+      }
+    }
+    // Third-party renderers receive only members checked by the bounded ZIP reader.
+    return zipSync(parts, { level: 0 });
+  }
   relations(part: string): Map<string, string> {
     const result = new Map<string, string>();
     const path = posix.join(posix.dirname(part), '_rels', `${posix.basename(part)}.rels`);
