@@ -65,7 +65,7 @@
   align-items: stretch; gap: 0; background: var(--vscode-editorGroupHeader-tabsBackground);
 }
 .office-viewer.excel .sheet-tabs button {
-  border-radius: 0; border-top: 2px solid transparent; border-right: 1px solid var(--vscode-tab-border);
+  padding-block: 7px; border-radius: 0; border-top: 2px solid transparent; border-right: 1px solid var(--vscode-tab-border);
   color: var(--vscode-tab-inactiveForeground); background: var(--vscode-tab-inactiveBackground);
 }
 .office-viewer.excel .sheet-tabs button[aria-pressed="true"] {

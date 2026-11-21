@@ -1,15 +1,22 @@
+import { EntityDecoder } from '@nodable/entities';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import type { XmlNode } from './archive.js';
 
+const entityDecoder = new EntityDecoder();
 const parser = new XMLParser({
   preserveOrder: true, ignoreAttributes: false, attributeNamePrefix: '',
   removeNSPrefix: false, transformTagName: (name: string) => name.split(':').pop()!,
   parseTagValue: false, trimValues: false, ignoreDeclaration: true, ignorePiTags: true,
+  entityDecoder,
 });
 export function validateXml(source: string, path: string): void {
   if (/<!DOCTYPE|<!ENTITY/i.test(source) || XMLValidator.validate(source) !== true) throw new Error(`Office XML 无效：${path}`);
 }
-export function parseXml(source: string): XmlNode[] { return parser.parse(source) as XmlNode[]; }
+export function parseXml(source: string): XmlNode[] {
+  // Cell fragments have no XML declaration and start with the default version.
+  entityDecoder.setXmlVersion(1.0);
+  return parser.parse(source) as XmlNode[];
+}
 export interface XmlRange { start: number; end: number; head: number; name: string }
 
 // Index byte-independent string ranges, without constructing an XML object

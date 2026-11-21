@@ -45,6 +45,26 @@ function fetchGrid(document: OfficeDocument, source: string, options: Partial<Gr
   const bytes = Buffer.concat(chunks);
   return { data: JSON.parse(bytes.toString('utf8')) as GridPayload, replies: chunks.length, bytes: bytes.length };
 }
+test('Excel decodes numeric XML references once in both grid payloads', () => {
+  const row = `<row r="1">
+    <c r="A1" t="s"><v>0</v></c>
+    <c r="B1" t="inlineStr"><is><t>上&#xA;下 &amp;#10; <![CDATA[&#10;]]></t></is></c>
+    <c r="C1" t="str"><f>TEXT(A1, "@")</f><v>缓存&#13;&#10;文本</v></c>
+  </row>`;
+  const shared = '<sst><si><r><t>类型：&#10;</t></r><r><t>设置时间开启 &#x1F642;</t></r></si></sst>';
+  for (const deferred of [false, true]) {
+    const padding = deferred ? `<!--${' '.repeat(64 << 10)}-->` : '';
+    const document = new OfficeDocument('/entities.xlsx', workbook(`<worksheet>${padding}<sheetData>${row}</sheetData></worksheet>`, shared));
+    const initial = attribute<GridPayload>(html(document), 'data-pencode-grid');
+    assert.equal(Boolean(initial.source), deferred);
+    const { cells } = deferred ? fetchGrid(document, initial.source, { endColumn: 4 }).data : initial;
+    assert.deepEqual(cells, [
+      [1, 1, '类型：\n设置时间开启 🙂', 0],
+      [1, 2, '上\n下 &#10; &#10;', 0],
+      [1, 3, '缓存\r\n文本', 0],
+    ]);
+  }
+});
 test('large Excel fetches both axes on demand and streams full search/copy data beyond 1.8 MiB', () => {
   const sheet = '<worksheet><cols><col min="2" max="2" width="40"/></cols><sheetData>' + Array.from({ length: 6000 }, (_, i) => `<row r="${i+1}" ht="30"><c r="A${i+1}" t="inlineStr" s="1"><is><t>行${i+1} ${'中文🙂 &amp;&lt;&quot;'.repeat(24)}</t></is></c><c r="AD${i+1}"><v>${i+1}</v></c></row>`).join('') + '</sheetData></worksheet>';
   const document = new OfficeDocument('/large.xlsx', workbook(sheet));
