@@ -235,6 +235,6 @@ export class SheetData {
       rowHeight: Math.max(21, this.defaultHeight), columnWidth: this.defaultWidth,
       ...this.deferred ? { source: this.source, styles: [''], cells: [] } : { ...this.metadata(), cells: this.inline },
     };
-    return `<div class="sheet-grid" data-ref="office-grid" data-pencode-grid="${escape(JSON.stringify(grid))}"></div>`;
+    return `<div class="sheet-grid" data-ref="office-grid" data-pencode-highlight-rows data-pencode-highlight-cells data-pencode-grid="${escape(JSON.stringify(grid))}"></div>`;
   }
 }

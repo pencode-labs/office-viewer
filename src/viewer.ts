@@ -40,12 +40,17 @@ export class OfficeDocument {
   private slideHeight = 540;
   private slideText = false;
   private index = 0;
-  constructor(readonly path: string, data: Uint8Array | string = path) {
+  get sheetName(): string | undefined { return this.sheet?.sheet.name; }
+  constructor(readonly path: string, data: Uint8Array | string = path, sheetName?: string) {
     this.archive = new Archive(data);
     const extension = extname(path).toLowerCase();
     try {
       if (extension === '.docx') this.archive.source('word/document.xml');
-      if (extension === '.xlsx') { this.book = new Workbook(this.archive); this.sheet = this.book.open(0); }
+      if (extension === '.xlsx') {
+        this.book = new Workbook(this.archive);
+        if (sheetName !== undefined) this.index = Math.max(0, this.book.sheets.findIndex(sheet => sheet.name === sheetName));
+        this.sheet = this.book.open(this.index);
+      }
       if (extension === '.pptx') {
         const presentation = this.archive.xml('ppt/presentation.xml');
         const size = descendants(presentation, 'sldSz').next().value;
@@ -64,8 +69,8 @@ export class OfficeDocument {
       if (!['.docx', '.xlsx', '.pptx'].includes(extension)) throw new Error('请选择 .docx、.xlsx 或 .pptx 文件');
     } catch (error) { this.archive.close(); throw error; }
   }
-  static async open(path: string, data: Uint8Array | string = path): Promise<OfficeDocument> {
-    const document = new OfficeDocument(path, data);
+  static async open(path: string, sheetName?: string): Promise<OfficeDocument> {
+    const document = new OfficeDocument(path, path, sheetName);
     try {
       const extension = extname(path).toLowerCase();
       if (extension === '.docx') {
@@ -207,8 +212,9 @@ export function createViewer(signal: AbortSignal): (message: EditorMessage) => P
         return document.view();
       }
       if (!['open', 'documentchange'].includes(message.event.kind) && message.event.ref !== 'reload') return {};
+      const sheetName = message.event.kind === 'documentchange' && document?.path === message.path ? document.sheetName : undefined;
       document?.close(); document = undefined;
-      const next = await OfficeDocument.open(message.path);
+      const next = await OfficeDocument.open(message.path, sheetName);
       try { const reply = next.view(); document = next; return reply; }
       catch (error) { next.close(); throw error; }
     } catch (error) {

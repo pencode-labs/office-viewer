@@ -98,3 +98,5 @@
 .office-content .pencode-grid-cell { position: absolute; box-sizing: border-box; padding: 0 6px; border-right: 1px solid var(--vscode-editorGroup-border); border-bottom: 1px solid var(--vscode-editorGroup-border); line-height: 20px; white-space: pre; overflow: hidden; overflow-wrap: normal; }
 .office-content .pencode-grid-cell:empty { overflow: visible; }
 .office-content .pencode-grid-header { background: var(--vscode-editorWidget-background); font-weight: 600; }
+.office-content .pencode-grid-cell[role="rowheader"] { cursor: pointer; }
+.office-content .pencode-grid-cell[aria-selected="true"] { color: var(--vscode-list-activeSelectionForeground); background: var(--vscode-list-activeSelectionBackground); }

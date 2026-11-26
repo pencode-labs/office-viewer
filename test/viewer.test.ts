@@ -67,6 +67,8 @@ test('Excel resolves relationships, strings, cached formulas, dates and all spar
   assert.doesNotMatch(first, /office-file-mark|book\.xlsx|只读预览/);
   assert.match(first, /data-ref="sheet-0"[^>]*aria-pressed="true"/);
   assert.match(first, /data-pencode-selectable data-pencode-searchable data-pencode-preserve-whitespace/);
+  assert.match(first, /data-pencode-highlight-rows/);
+  assert.match(first, /data-pencode-highlight-cells/);
   assert.equal(document.event('next'), false);
   assert.equal(document.event('sheet-1'), true);
   assert.equal(grid(html(document)).columns, 26);
@@ -144,6 +146,25 @@ test('PowerPoint follows presentation order and excludes external images', () =>
   assert.match(html(document), /<article[^>]*>.*第一张/);
   assert.equal(document.event('slide-99'), false);
   assert.equal(document.event('next'), false);
+});
+test('Excel refresh follows the selected sheet across edits and reordering', async () => {
+  const abort = new AbortController(), handle = createViewer(abort.signal);
+  const directory = await mkdtemp(join(tmpdir(), 'pencode-excel-'));
+  const path = join(directory, '系统信息.xlsx');
+  const save = (names: string[], revision: string) => writeFile(path, zip({
+    'xl/workbook.xml': '<workbook><sheets>' + names.map((name, i) => `<sheet name="${name}" r:id="r${i}"/>`).join('') + '</sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<Relationships>' + names.map((_, i) => `<Relationship Id="r${i}" Target="worksheets/s${i}.xml"/>`).join('') + '</Relationships>',
+    ...Object.fromEntries(names.map((name, i) => [`xl/worksheets/s${i}.xml`, `<worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>${name} ${revision}</t></is></c></row></sheetData></worksheet>`])),
+  }));
+  try {
+    await save(['目录', '数据'], 'v1');
+    await handle(message(path));
+    assert.equal(grid((await handle(message(path, 'click', 'sheet-1'))).view!.html!).cells[0]![2], '数据 v1');
+    await save(['目录', '新增', '数据'], 'v2');
+    assert.equal(grid((await handle(message(path, 'documentchange'))).view!.html!).cells[0]![2], '数据 v2');
+    await save(['目录'], 'v3');
+    assert.equal(grid((await handle(message(path, 'documentchange'))).view!.html!).cells[0]![2], '目录 v3');
+  } finally { abort.abort(); await rm(directory, { recursive: true, force: true }); }
 });
 test('viewer retries corrupt files and refreshes without modifying the Office source', async () => {
   const abort = new AbortController();
